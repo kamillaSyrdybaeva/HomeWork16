@@ -1,5 +1,6 @@
 package com.example.todo.ui.fragments
 
+
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.os.Bundle
@@ -14,11 +15,14 @@ import com.example.todo.ui.adapters.TaskAdapter
 import com.example.todo.ui.fragments.models.CreateDataModel
 import com.example.todo.ui.inter.OnItemClickHome
 import com.example.todo.ui.inter.OnItemClicker
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 class HomeFragment : Fragment(), OnItemClickHome {
 
     private lateinit var binding: FragmentHomeBinding
-    var adapter = TaskAdapter(arrayListOf(),this)
+    var adapter = TaskAdapter(arrayListOf(), this)
+    private val fireStore = Firebase.firestore
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -33,8 +37,18 @@ class HomeFragment : Fragment(), OnItemClickHome {
         super.onViewCreated(view, savedInstanceState)
         initClicker()
 
-        App.appDataBase.taskDao().getAll().observe(viewLifecycleOwner) {data->
-            adapter = TaskAdapter(data, this)
+//        App.appDataBase.taskDao().getAll().observe(viewLifecycleOwner) {data->
+        val list = arrayListOf<CreateDataModel>()
+
+        fireStore.collection("task").get().addOnSuccessListener { result ->
+            for (document in result) {
+                val task = document.data["task"].toString()
+                val date = document.data["date"].toString()
+                val regular = document.data["regular"].toString()
+                val model = CreateDataModel(task = task, date = date, regular = regular)
+                list.add(model)
+            }
+            adapter = TaskAdapter(list, this)
             binding.recyclerTask.adapter = adapter
         }
     }
@@ -45,7 +59,6 @@ class HomeFragment : Fragment(), OnItemClickHome {
             dialog.show(requireActivity().supportFragmentManager, "")
         }
     }
-
 
 
     override fun update(taskModel: CreateDataModel) {
@@ -59,13 +72,11 @@ class HomeFragment : Fragment(), OnItemClickHome {
     override fun delete(taskModel: CreateDataModel) {
         val dialog = AlertDialog.Builder(requireActivity())
         dialog.setTitle("Вы точно хотите удалить задачу?")
-        dialog.setPositiveButton("Да", DialogInterface.OnClickListener{
-            dialogInterface, i ->
+        dialog.setPositiveButton("Да", DialogInterface.OnClickListener { dialogInterface, i ->
             App.appDataBase.taskDao().deleteData(taskModel)
             dialogInterface.dismiss()
         })
-        dialog.setNegativeButton("Нет", DialogInterface.OnClickListener{
-            dialogInterface, i ->
+        dialog.setNegativeButton("Нет", DialogInterface.OnClickListener { dialogInterface, i ->
             dialogInterface.dismiss()
         })
         dialog.show()

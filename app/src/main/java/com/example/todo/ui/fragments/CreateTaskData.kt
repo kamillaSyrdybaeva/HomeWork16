@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,18 +19,20 @@ import com.example.todo.databinding.DialogRegularBinding
 import com.example.todo.databinding.FragmentCreateTaskDataBinding
 import com.example.todo.ui.fragments.models.CreateDataModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 
 class CreateTaskData : BottomSheetDialogFragment() {
 
     private lateinit var binding: FragmentCreateTaskDataBinding
     private var taskModel: CreateDataModel? = null
+    private val fireStore = Firebase.firestore
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        // Inflate the layout for this fragment
         binding = FragmentCreateTaskDataBinding.inflate(layoutInflater)
         return binding.root
 
@@ -87,7 +90,11 @@ class CreateTaskData : BottomSheetDialogFragment() {
                     )
                     App.appDataBase.taskDao().updateData(upDateModel)
                 }else{
-                    App.appDataBase.taskDao().insert(model)
+                    fireStore.collection("task").add(model).addOnSuccessListener {
+                        Log.e("task", "success")
+                    }.addOnFailureListener{
+                        Log.e("task", "error ${it.message}")
+                    }
                 }
                 findNavController().navigate(R.id.homeFragment)
                 dismiss()

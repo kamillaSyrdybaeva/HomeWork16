@@ -1,5 +1,8 @@
 package com.example.todo.ui.fragments
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
@@ -14,6 +17,9 @@ import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.*
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 
@@ -40,6 +46,7 @@ class AuthFragment : Fragment() {
         auth = Firebase.auth
         initClicker()
         checkUser()
+        userRegistrationDate()
 
         callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
 
@@ -66,6 +73,14 @@ class AuthFragment : Fragment() {
                 resendToken = token
             }
         }
+    }
+
+    @SuppressLint("SimpleDateFormat")
+    private fun userRegistrationDate() {
+        val date: DateFormat = SimpleDateFormat("MMM dd yyyy, h:mm")
+        val dateFormatted = date.format(Calendar.getInstance().time)
+        val sharedPreferences: SharedPreferences = requireContext().getSharedPreferences("userDateRegistration", Context.MODE_PRIVATE)
+        sharedPreferences.edit().putString("dateRegistration", dateFormatted.toString()).apply()
     }
 
     private fun initClicker() {
@@ -97,7 +112,7 @@ class AuthFragment : Fragment() {
             .addOnCompleteListener(requireActivity()) { task ->
                 if (task.isSuccessful) {
                     Log.d(TAG, "signInWithCredential:success")
-                    findNavController().navigate(R.id.onBoardingFragment)
+                    findNavController().navigate(R.id.createProfileFragment)
                     val user = task.result?.user
                 } else {
                     Log.w(TAG, "signInWithCredential:failure", task.exception)
@@ -114,7 +129,7 @@ class AuthFragment : Fragment() {
     private fun checkUser() {
         val firebaseUser = auth.currentUser
         if (firebaseUser != null) {
-            findNavController().navigate(R.id.homeFragment)
+            findNavController().navigate(R.id.createProfileFragment)
         }
     }
 }

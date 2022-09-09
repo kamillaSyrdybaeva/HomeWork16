@@ -1,34 +1,41 @@
 package com.example.todo.ui.fragments
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.preference.PreferenceManager
-import android.provider.MediaStore
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
-import com.example.todo.R
 import com.example.todo.databinding.FragmentProfileBinding
-import java.lang.String
+import com.google.android.gms.tasks.OnSuccessListener
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
+import java.net.URL
 import java.util.*
-import kotlin.Int
-import kotlin.arrayOf
+import androidx.annotation.NonNull
+
+import com.google.android.gms.tasks.OnFailureListener
 
 
 class ProfileFragment : Fragment() {
 
     lateinit var binding: FragmentProfileBinding
-    private val PICK_IMAGE_REQUEST = 1
-    private var imageUri: Uri? = null
-    private var image: Uri? = null
+    private val fireStore = Firebase.firestore
+    private lateinit var auth: FirebaseAuth
+    private var storage: FirebaseStorage? = null
+    private var storageRef: StorageReference? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -41,63 +48,63 @@ class ProfileFragment : Fragment() {
     @SuppressLint("IntentReset")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.ivProfileImage.setOnClickListener {
-            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-            startActivity(intent)
-            imageSelect()
-        }
-        val sharedPreferences: SharedPreferences = requireContext().getSharedPreferences(
-            "profile_preferences",
-            Context.MODE_PRIVATE
-        )
-        val imageProfile = sharedPreferences.getString("image", R.color.black.toString())
-
-        image = Uri.parse(imageProfile)
-
-        binding.ivProfileImage.setImageURI(image)
-    }
-
-    private fun imageSelect() {
-        val intent: Intent
-        if (Build.VERSION.SDK_INT < 19) {
-            intent = Intent(Intent.ACTION_GET_CONTENT)
-        } else {
-            intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-            intent.addCategory(Intent.CATEGORY_OPENABLE)
-        }
-        intent.type = "image/*"
-        startActivityForResult(
-            Intent.createChooser(intent, "Select Picture"),
-            PICK_IMAGE_REQUEST
-        )
-    }
-
-     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == PICK_IMAGE_REQUEST) {
-            if (resultCode == Activity.RESULT_OK) {
-                if (data != null) {
-                    imageUri = data.data
-                    requireActivity().grantUriPermission(
-                        requireContext().packageName,
-                        imageUri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                    val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    imageUri?.let {
-                        requireActivity().contentResolver.takePersistableUriPermission(
-                            it, takeFlags)
-                    }
-
-                    val sharedPreferences: SharedPreferences = requireContext().getSharedPreferences(
-                        "profile_preferences",
-                        Context.MODE_PRIVATE
-                    )
-                    sharedPreferences.edit().putString("image", imageUri.toString()).apply()
-
-                    binding.ivProfileImage.setImageURI(imageUri)
-                    binding.ivProfileImage.invalidate()
+        addUserInfo()
+        auth = Firebase.auth
+        storage = FirebaseStorage.getInstance()
+        storageRef = storage!!.reference.child("myImages")
+        val userImage = storageRef!!.listAll()
+        userImage.addOnCompleteListener { result ->
+            val items = result.result!!.items
+            items.forEachIndexed { index, storageReference ->
+                storageReference.downloadUrl.addOnSuccessListener {
+                    Log.d("item", "$it")
+                    //загрузка фотки пользователя с firebase
+                    Glide.with(binding.ivProfileImage).load(it).into(binding.ivProfileImage)
                 }
             }
         }
+
+    }
+
+
+    private fun addUserInfo() {
+        //userRegistrationDate
+        val sharedPreferences: SharedPreferences =
+            requireContext().getSharedPreferences("userDateRegistration", Context.MODE_PRIVATE)
+        val userDateRegistration =
+            sharedPreferences.getString("dateRegistration", "ошибочка:(").toString()
+        binding.tvUserLoggedIn.text = userDateRegistration
+        fireStore.collection("user").get().addOnSuccessListener { result ->
+            for (document in result) {
+                with(binding) {
+                    //user name
+                    tvUserName.text = document.get("name").toString()
+                    //user password
+                    tvUserPassword.text = document.get("password").toString()
+                }
+            }
+        }
+        //quantity task user
+        fireStore.collection("task").get().addOnCompleteListener { result ->
+            if (result.isSuccessful) {
+                result.result?.apply {
+                    binding.tvUserNumberOfTask.text = size().toString()
+                }
+            } else {
+                result.exception?.message?.let {
+                    print(it)
+                }
+            }
+        }
+    }
+
+    private fun downloadImage(reference: StorageReference) {
+        reference.downloadUrl.addOnSuccessListener {
+            val url: String = it.toString()
+            Glide.with(requireContext()).load(url).into(binding.ivProfileImage)
+        }.addOnFailureListener {
+            // Handle any errors
+        }
+
     }
 }
